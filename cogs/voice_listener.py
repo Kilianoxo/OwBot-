@@ -297,18 +297,18 @@ class VoiceListener(commands.Cog):
 
         # ── Auto-join quand quelqu'un rejoint un channel OW ─────────────
         if after.channel is not None and self._is_ow_channel(after.channel):
-            already_connected = (
-                guild_id in self.voice_clients
-                and self.voice_clients[guild_id].is_connected()
-            )
+            # Utilise bot.voice_clients (plus fiable que notre dict interne)
+            existing_vc = discord.utils.get(self.bot.voice_clients, guild=member.guild)
+            already_connected = existing_vc is not None and existing_vc.is_connected()
+
             if not already_connected:
+                text_ch = self._find_text_channel(member.guild)
                 try:
                     vc = await after.channel.connect()
                     self.voice_clients[guild_id] = vc
                     self.listening[guild_id] = True
                     self.auto_joined.add(guild_id)
 
-                    text_ch = self._find_text_channel(member.guild)
                     if text_ch:
                         self.text_channels[guild_id] = text_ch
                         await text_ch.send(
@@ -316,9 +316,13 @@ class VoiceListener(commands.Cog):
                             f"Zenyobott est là aussi. Je prends des notes. 📋"
                         )
                     asyncio.create_task(self._listen_loop(guild_id, after.channel))
-                except Exception:
-                    pass
-                return
+                except Exception as e:
+                    print(f"[VoiceListener] Erreur auto-join '{after.channel.name}': {e}")
+                    if text_ch:
+                        await text_ch.send(
+                            f"⚠️ Impossible de rejoindre **{after.channel.name}** : `{e}`"
+                        )
+            return  # Toujours sortir après le bloc OW
 
         # ── Auto-leave si le channel OW se vide ─────────────────────────
         if before.channel is not None and self._is_ow_channel(before.channel):
