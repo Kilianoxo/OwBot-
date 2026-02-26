@@ -120,6 +120,9 @@ class VoiceListener(commands.Cog):
             )
             return
 
+        # Defer immédiatement — connect() peut prendre > 3s
+        await interaction.response.defer()
+
         voice_channel = interaction.user.voice.channel
         guild_id = interaction.guild_id
 
@@ -132,7 +135,7 @@ class VoiceListener(commands.Cog):
         self.text_channels[guild_id] = interaction.channel
         self.listening[guild_id] = True
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Je suis dans **{voice_channel.name}** ! Je vais tout écouter... 👁️🎤\n"
             f"Mes commentaires arriveront ici. Soyez prudents avec vos mots."
         )
