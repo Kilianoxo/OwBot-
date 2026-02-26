@@ -209,6 +209,20 @@ CHAT_RESPONSES = {
     ],
 }
 
+# Réponses quand on appelle le bot par son nom (100% déclenchement)
+SELF_MENTION_RESPONSES = [
+    "Oui ? J'écoute. J'écoutais déjà, en fait. 👁️",
+    "Présent. Comme toujours. Vous pensiez que je dormais ? 🤖",
+    "Zenyobott à votre service. Que puis-je noter sur votre compte ? 📋",
+    "On m'appelle ? OwBot/Zenyobott — les deux fonctionnent, la surveillance aussi.",
+    "Je suis là. J'ai tout entendu. Depuis le début. ☮️",
+    "Vous m'appelez ? Mes capteurs étaient déjà sur vous. 👁️",
+    "Oui, c'est moi. Non, je ne pars pas. 🤖",
+    "Zenyobott répond. Le dossier est déjà ouvert à votre nom. 📁",
+    "Experience tranquility... ou pas. Je suis là quoi qu'il arrive. ☮️",
+    "Appelez-moi une fois, je réponds. Appelez-moi deux fois, j'ai déjà le dossier prêt.",
+]
+
 
 class AutoDJ(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -272,6 +286,9 @@ class AutoDJ(commands.Cog):
 
     # ── Réponses autonomes aux messages ───────
 
+    # Noms par lesquels le bot se reconnaît
+    BOT_NAMES = {"zen", "zenyobott", "zenyobot", "bot", "owbot"}
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Répond spontanément aux messages sans être mentionné."""
@@ -283,11 +300,22 @@ class AutoDJ(commands.Cog):
 
         now = time.time()
         channel_id = message.channel.id
-        # Cooldown : 90 secondes minimum entre deux réponses par salon
-        if now - self._last_chat_response.get(channel_id, 0) < 90:
+        content_lower = message.content.lower()
+
+        # Détection du nom du bot → réponse 100%, cooldown court (10s)
+        is_self_mention = any(name in content_lower for name in self.BOT_NAMES)
+        if is_self_mention:
+            if now - self._last_chat_response.get(channel_id, 0) < 10:
+                return
+            self._last_chat_response[channel_id] = now
+            response = await self._self_mention_response(message)
+            if response:
+                await message.channel.send(response)
             return
 
-        content_lower = message.content.lower()
+        # Cooldown : 30 secondes minimum entre deux réponses par salon
+        if now - self._last_chat_response.get(channel_id, 0) < 30:
+            return
 
         # Cherche un mot-clé déclencheur
         triggered_key = None
@@ -298,8 +326,8 @@ class AutoDJ(commands.Cog):
                 triggered_key = key
                 break
 
-        # Probabilité de répondre : 35% si mot-clé, 4% sinon
-        chance = 0.35 if triggered_key else 0.04
+        # Probabilité de répondre : 45% si mot-clé, 10% sinon
+        chance = 0.45 if triggered_key else 0.10
         if random.random() > chance:
             return
 
@@ -309,6 +337,20 @@ class AutoDJ(commands.Cog):
         response = await self._chat_response(message, triggered_key, content_lower)
         if response:
             await message.channel.send(response)
+
+    async def _self_mention_response(self, message: discord.Message) -> str | None:
+        """Génère une réponse quand le bot est appelé par son nom."""
+        if ANTHROPIC_API_KEY:
+            prompt = (
+                f"Un joueur Discord nommé {message.author.display_name} t'appelle en disant : \"{message.content[:150]}\"\n"
+                f"Tu es Zenyobott, un bot Discord sarcastique et geek inspiré de Zenyatta d'Overwatch. "
+                f"Réponds avec UNE phrase courte et légèrement sarcastique en français, comme si tu étais là depuis le début. "
+                f"Pas de balises markdown. Ajoute un emoji ☮️ ou 👁️ à la fin."
+            )
+            result = await self._call_claude(prompt)
+            if result:
+                return result
+        return random.choice(SELF_MENTION_RESPONSES)
 
     async def _chat_response(self, message: discord.Message, triggered_key: str | None, content_lower: str) -> str | None:
         """Génère une réponse contextuelle à un message du chat."""

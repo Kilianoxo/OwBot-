@@ -79,12 +79,36 @@ FUNNY_VOICE_COMMENTS = [
 ]
 
 
+# Mots qui identifient un salon vocal Overwatch (insensible à la casse)
+OW_CHANNEL_KEYWORDS = ["ow", "overwatch", "gaming", "game", "ranked", "jeux", "play"]
+
+
 class VoiceListener(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.voice_clients: dict[int, discord.VoiceClient] = {}
         self.text_channels: dict[int, discord.TextChannel] = {}
         self.listening: dict[int, bool] = {}
+        # Guilds où le bot a rejoint automatiquement (pour distinguer auto vs manuel)
+        self.auto_joined: set[int] = set()
+
+    def _is_ow_channel(self, channel: discord.VoiceChannel) -> bool:
+        """Vérifie si le nom du salon vocal correspond à un channel Overwatch."""
+        name_lower = channel.name.lower()
+        return any(kw in name_lower for kw in OW_CHANNEL_KEYWORDS)
+
+    def _find_text_channel(self, guild: discord.Guild) -> discord.TextChannel | None:
+        """Trouve le meilleur salon texte pour poster les commentaires vocaux."""
+        priority_keywords = ["ow", "overwatch", "gaming", "jeux", "général", "general", "chat"]
+        for kw in priority_keywords:
+            for ch in guild.text_channels:
+                if kw in ch.name.lower() and ch.permissions_for(guild.me).send_messages:
+                    return ch
+        # Fallback : premier salon texte accessible
+        for ch in guild.text_channels:
+            if ch.permissions_for(guild.me).send_messages:
+                return ch
+        return None
 
     # ── Commandes slash ───────────────────────
 
@@ -265,11 +289,58 @@ class VoiceListener(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ):
-        """Commentaire quand quelqu'un rejoint/quitte le vocal."""
+        """Auto-join le channel OW, commentaires d'entrée/sortie, auto-leave si vide."""
         guild_id = member.guild.id
-        if guild_id not in self.text_channels:
-            return
+
         if member.bot:
+            return
+
+        # ── Auto-join quand quelqu'un rejoint un channel OW ─────────────
+        if after.channel is not None and self._is_ow_channel(after.channel):
+            already_connected = (
+                guild_id in self.voice_clients
+                and self.voice_clients[guild_id].is_connected()
+            )
+            if not already_connected:
+                try:
+                    vc = await after.channel.connect()
+                    self.voice_clients[guild_id] = vc
+                    self.listening[guild_id] = True
+                    self.auto_joined.add(guild_id)
+
+                    text_ch = self._find_text_channel(member.guild)
+                    if text_ch:
+                        self.text_channels[guild_id] = text_ch
+                        await text_ch.send(
+                            f"👁️ **{member.display_name}** vient de rejoindre **{after.channel.name}** — "
+                            f"Zenyobott est là aussi. Je prends des notes. 📋"
+                        )
+                    asyncio.create_task(self._listen_loop(guild_id, after.channel))
+                except Exception:
+                    pass
+                return
+
+        # ── Auto-leave si le channel OW se vide ─────────────────────────
+        if before.channel is not None and self._is_ow_channel(before.channel):
+            vc = self.voice_clients.get(guild_id)
+            if vc and vc.is_connected() and guild_id in self.auto_joined:
+                # Compte les humains restants dans le channel
+                humans = [m for m in before.channel.members if not m.bot]
+                if not humans:
+                    self.listening[guild_id] = False
+                    await vc.disconnect()
+                    self.voice_clients.pop(guild_id, None)
+                    self.auto_joined.discard(guild_id)
+                    text_ch = self.text_channels.get(guild_id)
+                    if text_ch:
+                        await text_ch.send(
+                            f"🚪 Le salon **{before.channel.name}** est vide. "
+                            f"Zenyobott se retire. Les données ont été sauvegardées. ☮️"
+                        )
+                    return
+
+        # ── Commentaires d'entrée/sortie (si le bot est déjà dans le salon) ──
+        if guild_id not in self.text_channels:
             return
 
         channel = self.text_channels[guild_id]
