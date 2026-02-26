@@ -1,24 +1,16 @@
 """
-voice_listener.py — OwBot écoute les salons vocaux Overwatch et fait des blagues.
+voice_listener.py — OwBot est présent dans les salons vocaux Overwatch et fait des blagues.
 
 Fonctionnement :
   1. /join   → le bot rejoint le salon vocal de l'utilisateur
-  2. Le bot enregistre l'audio (PCM) par tranches de ~5 s
-  3. Transcription via faster-whisper (local, gratuit) ou OpenAI Whisper API
-  4. Génération d'une blague/commentaire via Claude ou templates
-  5. Envoi du commentaire dans le salon texte associé
-
-Dépendances optionnelles :
-  - faster-whisper  (pip install faster-whisper)   ← STT local
-  - openai          (pip install openai)             ← Whisper API alternative
+  2. Le bot poste des commentaires périodiques dans le salon texte associé
+  3. Auto-join quand quelqu'un rejoint un salon nommé "OW" ou similaire
+  4. Auto-leave quand le salon se vide
 """
 
 import os
-import io
-import wave
 import asyncio
 import random
-import struct
 from typing import Optional
 
 import discord
@@ -27,8 +19,6 @@ from discord.ext import commands
 
 from cogs.autodj import AutoDJ
 from cogs.fun import ALL_HEROES
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Mots Overwatch → réaction drôle automatique
 VOICE_KEYWORDS = {
@@ -154,136 +144,36 @@ class VoiceListener(commands.Cog):
 
         await interaction.response.send_message("J'ai tout entendu. Je pars avec les secrets. 🤫")
 
-    # ── Logique d'écoute ─────────────────────
+    # ── Logique de présence vocale ────────────
 
     async def _listen_loop(self, guild_id: int, voice_channel: discord.VoiceChannel):
-        """Boucle d'écoute — enregistre des tranches audio et les transcrit."""
-        vc = self.voice_clients.get(guild_id)
-        if vc is None:
-            return
-
-        try:
-            sink = discord.sinks.WaveSink()
-            vc.start_recording(sink, self._recording_finished, guild_id)
-
-            # Toutes les 8 secondes, on coupe et on analyse
-            while self.listening.get(guild_id) and vc.is_connected():
-                await asyncio.sleep(8)
-                if not self.listening.get(guild_id) or not vc.is_connected():
-                    break
-
-                vc.stop_recording()
-                await asyncio.sleep(0.5)
-
-                # Relancer pour la prochaine tranche
-                if self.listening.get(guild_id) and vc.is_connected():
-                    sink = discord.sinks.WaveSink()
-                    vc.start_recording(sink, self._recording_finished, guild_id)
-
-        except Exception as e:
-            channel = self.text_channels.get(guild_id)
-            if channel:
-                await channel.send(f"Problème d'écoute vocale : `{e}`")
-
-    async def _recording_finished(self, sink: discord.sinks.WaveSink, guild_id: int):
-        """Callback quand l'enregistrement s'arrête — transcrit et commente."""
-        text_channel = self.text_channels.get(guild_id)
-        if not text_channel:
-            return
-
-        transcripts = []
-        for user_id, audio in sink.audio_data.items():
-            transcript = await self._transcribe(audio.file)
-            if transcript:
-                transcripts.append((user_id, transcript))
-
-        if not transcripts:
-            return
-
-        # Réaction sur mots-clés détectés
-        full_text = " ".join(t for _, t in transcripts).lower()
-        reaction_sent = False
-
-        for keyword, reactions in VOICE_KEYWORDS.items():
-            if keyword in full_text:
-                await text_channel.send(f"🎙️ *{random.choice(reactions)}*")
-                reaction_sent = True
+        """Boucle de présence — fait des commentaires périodiques dans le vocal."""
+        while self.listening.get(guild_id):
+            vc = self.voice_clients.get(guild_id)
+            if vc is None or not vc.is_connected():
                 break
 
-        # Commentaire autonome aléatoire (20% de chance si pas déjà réagi)
-        if not reaction_sent and random.random() < 0.2:
-            autodj: Optional[AutoDJ] = self.bot.cogs.get("AutoDJ")
-            if autodj and VOICE_KEYWORDS:
-                comment = await self._generate_voice_comment(transcripts, autodj)
-                if comment:
-                    await text_channel.send(f"🎙️ {comment}")
+            # Commentaire toutes les 90–180 secondes
+            await asyncio.sleep(random.randint(90, 180))
 
-    async def _transcribe(self, audio_file: io.BytesIO) -> str:
-        """Transcrit un fichier audio en texte."""
-        audio_file.seek(0)
-        data = audio_file.read()
-        if len(data) < 1000:
-            return ""
+            if not self.listening.get(guild_id):
+                break
 
-        # Option 1 : faster-whisper (local)
-        try:
-            from faster_whisper import WhisperModel
-            import tempfile
+            vc = self.voice_clients.get(guild_id)
+            if vc is None or not vc.is_connected():
+                break
 
-            model = WhisperModel("tiny", device="cpu", compute_type="int8")
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                f.write(data)
-                tmp_path = f.name
+            text_channel = self.text_channels.get(guild_id)
+            if not text_channel:
+                continue
 
-            segments, _ = model.transcribe(tmp_path, language="fr")
-            return " ".join(s.text for s in segments).strip()
-        except ImportError:
-            pass
-
-        # Option 2 : OpenAI Whisper API
-        if OPENAI_API_KEY:
-            try:
-                import aiohttp
-                async with aiohttp.ClientSession() as session:
-                    form = aiohttp.FormData()
-                    form.add_field("file", data, filename="audio.wav", content_type="audio/wav")
-                    form.add_field("model", "whisper-1")
-                    form.add_field("language", "fr")
-                    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-                    async with session.post(
-                        "https://api.openai.com/v1/audio/transcriptions",
-                        headers=headers,
-                        data=form,
-                    ) as resp:
-                        if resp.status == 200:
-                            result = await resp.json()
-                            return result.get("text", "")
-            except Exception:
-                pass
-
-        return ""
-
-    async def _generate_voice_comment(
-        self, transcripts: list[tuple[int, str]], autodj: AutoDJ
-    ) -> str:
-        full_text = " ".join(t for _, t in transcripts)
-
-        # Essayer Claude pour un commentaire contextuel
-        if os.getenv("ANTHROPIC_API_KEY"):
-            prompt = (
-                f"Voici ce qui a été dit dans un vocal Discord Overwatch : \"{full_text[:200]}\"\n"
-                f"Génère un commentaire drôle, décalé et court (1-2 phrases max) en français "
-                f"comme si tu étais un bot Overwatch qui espionnait la conversation. "
-                f"Sois sarcastique et geek. Pas de balises markdown."
-            )
-            result = await autodj._call_claude(prompt)
-            if result:
-                return result
-
-        # Fallback
-        hero = random.choice(ALL_HEROES)
-        comment = random.choice(FUNNY_VOICE_COMMENTS)
-        return comment.format(hero=hero, player="quelqu'un")
+            # 50% chance de commenter
+            if random.random() < 0.5:
+                members = [m for m in voice_channel.members if not m.bot]
+                player = random.choice(members).display_name if members else "quelqu'un"
+                hero = random.choice(ALL_HEROES)
+                comment = random.choice(FUNNY_VOICE_COMMENTS).format(hero=hero, player=player)
+                await text_channel.send(f"🎙️ {comment}")
 
     @commands.Cog.listener()
     async def on_voice_state_update(
