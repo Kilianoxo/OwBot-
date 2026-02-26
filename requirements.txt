@@ -1,4 +1,17 @@
+# Bot Discord
 discord.py==2.3.2
-aiohttp==3.9.3
 python-dotenv==1.0.1
+
+# Scraping patch notes
+aiohttp==3.9.3
 beautifulsoup4==4.12.3
+
+# Base de données
+aiosqlite==0.20.0
+
+# STT local (optionnel — pour la fonctionnalité vocale)
+# Décommente si tu veux la transcription locale sans API :
+# faster-whisper==1.0.3
+
+# STT via API OpenAI (optionnel)
+# openai==1.30.1
