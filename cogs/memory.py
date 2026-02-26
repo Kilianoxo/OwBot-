@@ -25,24 +25,64 @@ DB_PATH = Path("data/owbot.db")
 
 # Mots Overwatch qui révèlent des habitudes
 HERO_ALIASES = {
-    "rein": "Reinhardt", "reine": "Reinhardt",
-    "dva": "D.Va", "d.va": "D.Va",
-    "ball": "Wrecking Ball", "hamster": "Wrecking Ball",
-    "cass": "Cassidy", "mcree": "Cassidy",
-    "geni": "Genji",
-    "widow": "Widowmaker", "widou": "Widowmaker",
-    "ana": "Ana", "moira": "Moira", "mercy": "Mercy",
+    "rein": "Reinhardt", "reine": "Reinhardt", "reinhardt": "Reinhardt",
+    "dva": "D.Va", "d.va": "D.Va", "diva": "D.Va",
+    "ball": "Wrecking Ball", "hamster": "Wrecking Ball", "wb": "Wrecking Ball",
+    "cass": "Cassidy", "mcree": "Cassidy", "cassidy": "Cassidy",
+    "geni": "Genji", "genji": "Genji",
+    "widow": "Widowmaker", "widou": "Widowmaker", "widowmaker": "Widowmaker",
+    "ana": "Ana",
+    "moira": "Moira",
+    "mercy": "Mercy", "valkyrie": "Mercy",
     "lucio": "Lúcio", "lúcio": "Lúcio",
-    "zen": "Zenyatta",
-    "pharah": "Pharah",
+    "zen": "Zenyatta", "zenyatta": "Zenyatta", "zenny": "Zenyatta",
+    "pharah": "Pharah", "phara": "Pharah",
     "bastion": "Bastion",
     "sigma": "Sigma",
     "zarya": "Zarya",
     "sombra": "Sombra",
+    "reaper": "Reaper", "reap": "Reaper",
+    "tracer": "Tracer",
+    "hanzo": "Hanzo",
+    "junkrat": "Junkrat", "rat": "Junkrat",
+    "mei": "Mei",
+    "soldier": "Soldier: 76", "s76": "Soldier: 76", "soldat": "Soldier: 76",
+    "sojourn": "Sojourn",
+    "symmetra": "Symmetra", "sym": "Symmetra",
+    "torb": "Torbjörn", "torbjorn": "Torbjörn",
+    "venture": "Venture",
+    "ashe": "Ashe",
+    "echo": "Echo",
+    "winston": "Winston", "singe": "Winston",
+    "orisa": "Orisa",
+    "road": "Roadhog", "roadhog": "Roadhog", "hog": "Roadhog",
+    "ramattra": "Ramattra", "ram": "Ramattra",
+    "mauga": "Mauga",
+    "junker": "Junker Queen", "jq": "Junker Queen",
+    "doomfist": "Doomfist", "doom": "Doomfist",
+    "hazard": "Hazard",
+    "baptiste": "Baptiste", "bap": "Baptiste",
+    "brigitte": "Brigitte", "brig": "Brigitte",
+    "illari": "Illari",
+    "juno": "Juno",
+    "kiriko": "Kiriko", "kiri": "Kiriko",
+    "lifeweaver": "Lifeweaver", "lw": "Lifeweaver",
+    "cassio": "Cassidy",
 }
 
-TILT_WORDS = ["feed", "feeder", "feedé", "nul", "noob", "report", "trollé", "afk", "inter"]
-CARRY_WORDS = ["ez", "gg ez", "facile", "clutch", "outplayed", "insane", "pog", "lets go"]
+TILT_WORDS = [
+    "feed", "feeder", "feedé", "nul", "noob", "report", "trollé", "afk", "inter",
+    "inutile", "useless", "bot", "fdp", "report", "rank", "deranker", "throw",
+    "thrower", "grief", "griefing", "cheat", "triche", "lag", "lagueur",
+    "scripter", "wallhack", "aim assist", "smurf", "smurfeur", "blâme",
+    "c'est nul", "c nul", "on perd", "c bon perdre", "gg on perd",
+]
+CARRY_WORDS = [
+    "ez", "gg ez", "facile", "clutch", "outplayed", "insane", "pog", "lets go",
+    "pogchamp", "carried", "carry", "hard carry", "popped off", "diffed",
+    "skilled", "goat", "mvp", "top frag", "on a géré", "on a fumé", "slam",
+    "on les a dominés", "victoire facile", "pas compliqué", "one shot", "oneshot",
+]
 
 
 def _get_hero_from_text(text: str) -> str | None:

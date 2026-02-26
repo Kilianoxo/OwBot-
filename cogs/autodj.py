@@ -9,6 +9,7 @@ import os
 import json
 import random
 import asyncio
+import time
 from pathlib import Path
 
 import aiohttp
@@ -62,6 +63,42 @@ On lance le GG, on stack les heures
 Le serveur Discord vibre et pleure
 Mais OwBot est là pour documenter
 Chaque clutch et chaque feeder 📋""",
+
+    """🎤 *OwBot — Gold Chronicles*
+
+{player1} en gold, {player2} en or
+{hero1} dans les mains, le rêve encore
+Payload sur Eichenwalde, personne se bouge
+Le tank crie "push !" mais l'équipe est rouge
+
+{hero2} qui ultime dans le vide complet
+Les heals qui heal tout sauf le bon
+OwBot observe, OwBot annote
+Diamond un jour, bronze toujours 📊""",
+
+    """🎵 *Le Rap du Ranked*
+
+Lundi soir, {player1} ouvre le jeu
+{hero1} main depuis la saison deux
+{player2} dit "j'suis chaud" avant de feed
+L'équipe qui pleure, personne qui lead
+
+On lose le point, on blame le sort
+{hero2} en carry mais l'équipe est morte
+OwBot juge de sa tour de contrôle
+GG WP — retour à la console 🕹️""",
+
+    """🎶 *Ode au Feeder*
+
+Hommage à {player1}, héros de notre temps
+{hero1} dans les mains, tilt dans le sang
+Cinq morts en deux minutes, record établi
+{player2} muet dans le vocal, tétanisé
+
+{hero2} essaie de hold, en vain, en vain
+Le score s'écroule comme un château romain
+Mais demain matin, {player1} relog
+Et recommence — tel est le prologue 🔄""",
 ]
 
 AUTONOMOUS_MESSAGES = [
@@ -73,7 +110,104 @@ AUTONOMOUS_MESSAGES = [
     "Bip boop. {player} vient de battre son record de tilt. Félicitations ?",
     "Je surveille. J'apprends. {player} sait ce qu'il a fait.",
     "Analyse comportementale : {player} — Personnalité : {personality}. Accuracy : 94%.",
+    "Rapport hebdomadaire : {player} a mentionné {hero} plus de {count} fois. Consultation recommandée.",
+    "Mise à jour du dossier : {player} présente un taux de tilt de {tilt_pct}%. Cas clinique intéressant.",
+    "OwBot détecte une anomalie : {player} dit \"{phrase}\". Fréquence : trop souvent.",
+    "Alerte statistique : {player} est classé '{personality}' dans notre base de données. Méritée.",
+    "Note de bas de page : {player} joue {hero}. L'équipe aussi, mais différemment.",
+    "Observation du jour : le serveur tourne bien. {player} tourne moins bien. 📉",
+    "Mémo interne : {player} atteint {tilt_pct}% de tilt. Les données ne jugent pas. Moi oui.",
+    "OwBot a terminé d'analyser {player}. Conclusion : {personality}. Traitement : ranked.",
 ]
+
+# Réponses contextuelles aux messages du chat (sans être mentionné)
+CHAT_RESPONSES = {
+    "gg": [
+        "GG effectivement. Authentique ou sarcasme ? OwBot note les deux possibilités.",
+        "GG validé. Score de sincérité : en cours de calcul...",
+        "Le GG a retenti. OwBot enregistre l'événement. 📋",
+    ],
+    "gg ez": [
+        "GG EZ. Classique. Le manuel du joueur tilté, page 1.",
+        "EZ dit celui qui a probablement le moins de stats. OwBot vérifie.",
+        "Easy pour qui exactement ? Les données suggèrent une autre réalité. 📊",
+    ],
+    "feed": [
+        "Le mot 'feed' a été prononcé. Dossier mis à jour. 🐔",
+        "Feed... un grand classique. Comme le payload à l'arrêt.",
+        "Feeder repéré ou accusé ? Dans les deux cas, OwBot prend note.",
+    ],
+    "feeder": [
+        "Le feeder, c'est jamais soi-même. Corrélation statistiquement confirmée.",
+        "Accusation de feed enregistrée. Contre-expertise en cours... 🔍",
+        "Le feeder du jour a été désigné. Reste à savoir si c'est mérité.",
+    ],
+    "tilt": [
+        "Tilt détecté ! ALERTE ROUGE 🌡️ — Recommandation : respire.",
+        "TILT en cours. OwBot augmente le niveau de surveillance.",
+        "Analyse : tilt confirmé. Solution proposée : 5 minutes de pause. Probabilité d'écoute : 3%.",
+    ],
+    "ranked": [
+        "Le ranked... le boss final de la santé mentale. 😰",
+        "Ranked activé. Taux de tilt prévu : +47%. C'est la norme.",
+        "Quelqu'un a dit ranked ? OwBot augmente la capacité du serveur pour les plaintes.",
+    ],
+    "noob": [
+        "Le mot 'noob' a été lâché. Chacun débute un jour. Certains plus longtemps que d'autres. 🔍",
+        "Accusation de noob détectée. Les données sur l'accusateur sont... intéressantes.",
+        "Noob ? Tout le monde l'était. Certains le restent.",
+    ],
+    "report": [
+        "Report demandé. OwBot ouvre le formulaire virtuel. 📋",
+        "La menace de report : arme classique du joueur frustré. Efficacité : variable.",
+        "Report en cours de traitement. Priorité dans la file d'attente : basse.",
+    ],
+    "clutch": [
+        "CLUTCH ! OwBot valide. C'est rare, autant le célébrer. 🏆",
+        "Clutch détecté ! Événement marqué dans les annales du serveur.",
+        "Le clutch a eu lieu. OwBot immortalise ce moment de gloire. 🔥",
+    ],
+    "ultime": [
+        "L'ultime est évoquée. OwBot passe en mode attente tactique. ⚡",
+        "Ult incoming... ou pas. Dans tous les cas, OwBot est prêt.",
+        "L'ultime : le moment qui décide tout. Surtout si elle rate. 💀",
+    ],
+    "ult": [
+        "Ult spotted. Position et timing notés. 🎯",
+        "L'ult change le game. Ou pas. Mais elle change quelque chose.",
+        "Ultime en vue. L'équipe est préparée ? Probablement non.",
+    ],
+    "oneshot": [
+        "One shot ! Soit brillant, soit Widowmaker. Souvent les deux. 🎯",
+        "Élimination instantanée détectée. OwBot applaudit sobrement.",
+        "One shot enregistré. La victime n'a pas eu le temps de suffer. ☠️",
+    ],
+    "inter": [
+        "Inter détecté. Le dossier s'épaissit. 📁",
+        "Intentional feed ? OwBot ajoute la mention au profil concerné.",
+        "L'inter... le pire de l'humanité condensé en une partie. 🤡",
+    ],
+    "afk": [
+        "AFK signalé. Quelqu'un a une urgence ou juste perdu goût à la vie. 🚶",
+        "Joueur AFK repéré. Le payload attend personne, sauf lui apparemment.",
+        "AFK = 5v6. OwBot calcule les nouvelles probabilités de victoire... 12%. 📉",
+    ],
+    "nano": [
+        "NANO ! Ana décide qui mérite de vivre. Philosophique. 💉",
+        "Le Nano Boost a été lâché. Espérons que c'est sur le bon joueur.",
+        "Nano détecté. Quelqu'un va faire des choses inconfortables pour l'ennemi. ⚡",
+    ],
+    "_default": [
+        "Je surveille. Toujours. 👁️",
+        "Intéressant. J'ajoute ça au dossier.",
+        "OwBot a entendu. OwBot se souvient.",
+        "Cette conversation est captivante. Continuez.",
+        "Note interne : activité détectée. Comportement analysé. 📊",
+        "OwBot prend note. Chaque mot compte.",
+        "Données reçues. Traitement en cours...",
+        "La surveillance est active. Je suis là, quelque part. 👁️",
+    ],
+}
 
 
 class AutoDJ(commands.Cog):
@@ -81,6 +215,8 @@ class AutoDJ(commands.Cog):
         self.bot = bot
         self.db = PlayerDB(DB_PATH)
         self.auto_channel_ids: list[int] = []
+        # Cooldown anti-spam : dernier message autonome par channel (timestamp)
+        self._last_chat_response: dict[int, float] = {}
         self.autonomous_post_task.start()
 
     def cog_unload(self):
@@ -133,6 +269,75 @@ class AutoDJ(commands.Cog):
     @autonomous_post_task.before_loop
     async def before_auto(self):
         await self.bot.wait_until_ready()
+
+    # ── Réponses autonomes aux messages ───────
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Répond spontanément aux messages sans être mentionné."""
+        if message.author.bot or not message.guild:
+            return
+        # Ignore les commandes slash
+        if message.content.startswith("/"):
+            return
+
+        now = time.time()
+        channel_id = message.channel.id
+        # Cooldown : 90 secondes minimum entre deux réponses par salon
+        if now - self._last_chat_response.get(channel_id, 0) < 90:
+            return
+
+        content_lower = message.content.lower()
+
+        # Cherche un mot-clé déclencheur
+        triggered_key = None
+        for key in CHAT_RESPONSES:
+            if key == "_default":
+                continue
+            if key in content_lower:
+                triggered_key = key
+                break
+
+        # Probabilité de répondre : 35% si mot-clé, 4% sinon
+        chance = 0.35 if triggered_key else 0.04
+        if random.random() > chance:
+            return
+
+        self._last_chat_response[channel_id] = now
+
+        # Génère la réponse
+        response = await self._chat_response(message, triggered_key, content_lower)
+        if response:
+            await message.channel.send(response)
+
+    async def _chat_response(self, message: discord.Message, triggered_key: str | None, content_lower: str) -> str | None:
+        """Génère une réponse contextuelle à un message du chat."""
+        # Essaie Claude si disponible
+        if ANTHROPIC_API_KEY:
+            player = await self.bot.loop.run_in_executor(
+                None, self.db.get_player, message.author.id
+            )
+            player_info = ""
+            if player and player["msg_count"] > 5:
+                top_hero = max(player["hero_counts"], key=player["hero_counts"].get) if player["hero_counts"] else "inconnu"
+                personality = self.db.personality_label(player)
+                player_info = f" Le joueur s'appelle {message.author.display_name}, son héros favori est {top_hero}, personnalité : {personality}."
+
+            prompt = (
+                f"Un joueur Overwatch 2 vient de dire dans Discord : \"{message.content[:150]}\"\n"
+                f"{player_info}\n"
+                f"Tu es OwBot, un bot Discord sarcastique et geek qui observe les joueurs Overwatch. "
+                f"Réponds avec UNE seule phrase courte et drôle en français, légèrement sarcastique. "
+                f"Pas de balises markdown. Ajoute un emoji pertinent à la fin."
+            )
+            result = await self._call_claude(prompt)
+            if result:
+                return result
+
+        # Fallback templates
+        if triggered_key and triggered_key in CHAT_RESPONSES:
+            return random.choice(CHAT_RESPONSES[triggered_key])
+        return random.choice(CHAT_RESPONSES["_default"])
 
     # ── Commandes slash ───────────────────────
 
